@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -7,7 +8,7 @@ const adminRoutes = require('./Router/adminRoute');
 const morgan = require('morgan');
 const subscriptionRoutes = require('./Router/subscriptionRoute');
 const transactionRoutes = require('./Router/transactionRoute');
-
+const webhookController = require('./controllers/webhookController'); // Add this import
 
 // Initialize Express app
 const app = express();
@@ -16,15 +17,16 @@ const app = express();
 app.use(cors());
 app.use(express.json()); 
 
-app.use(require('./Middleware/requestLogger'));
-app.use('/api', require('./Middleware/auth').apiLimiter);
+//app.use(require('./Middleware/requestLogger'));
+//app.use('/api', require('./Middleware/auth').apiLimiter);
 
+// Webhook route - must come before express.json() middleware
 app.post('/webhook', 
-    express.raw({ type: 'application/json' }),
-    require('./controllers/webhookController').handleWebhook
-  );
-  
+  express.raw({ type: 'application/json' }),
+  webhookController.handleWebhook
+);
 
+// Other middleware
 app.use(express.json());
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -32,11 +34,9 @@ if (process.env.NODE_ENV === 'development') {
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/admin', adminRoutes); 
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/transactions', transactionRoutes);
-  
-
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -45,15 +45,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error:', err));
-    
+
 // Basic route
 app.get('/', (req, res) => {
     res.send('Node.js Server is running');
-});
-
-// Example API route
-app.get('/api/data', (req, res) => {
-    res.json({ message: 'Data from backend', timestamp: new Date() });
 });
 
 // Error handling middleware

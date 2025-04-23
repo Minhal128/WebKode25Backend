@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, subscriptionRequired } = require('../middleware/authMiddleware');
+const { protect, subscriptionRequired } = require('../Middleware/authMiddleware');
 const {
   depositFunds,
   transferFunds,

@@ -59,3 +59,30 @@ exports.subscriptionRequired = async (req, res, next) => {
     }
     next();
   };
+
+  exports.optionalAuth = async (req, res, next) => {
+    let token;
+  
+    if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+  
+    if (token) {
+      try {
+        const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  
+        const user = await User.findById(decoded.id);
+        if (user) {
+          req.user = user; // attach user to request
+        }
+      } catch (err) {
+        return res.status(401).json({
+          message: 'Invalid token or session expired'
+        });
+      }
+    }
+  
+    // Continue whether or not token was found
+    next();
+  };
+  

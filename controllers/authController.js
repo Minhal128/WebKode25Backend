@@ -82,9 +82,20 @@ exports.login = async (req, res) => {
     }
 
     if (!user.isSubscribed) {
-      return res.status(403).json({ 
-        message: 'Please subscribe to access this service',
-        requiresSubscription: true 
+      const token = signToken(user._id); // Still give token but with limited access
+      
+      return res.status(200).json({
+        status: 'partial-success',
+        token,
+        requiresSubscription: true,
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            isVerified: user.isVerified,
+            isSubscribed: false
+          }
+        }
       });
     }
 

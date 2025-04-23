@@ -107,6 +107,17 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  stripeCardholderId: String,
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    zip: String
+  },
+  cards: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Card'
+  }],
   kycStatus: {
     type: String,
     enum: ['unverified', 'pending', 'verified', 'rejected'],
