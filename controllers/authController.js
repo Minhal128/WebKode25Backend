@@ -40,7 +40,7 @@ exports.login = async (req, res) => {
     }
 
     // 3) Check if user exists and password is correct
-    const user = await User.findOne({ email }).select('+password +isVerified +isSubscribed');
+    const user = await User.findOne({ email }).select('+password +isVerified +isSubscribed +role');
 
     if (!user || !(await user.correctPassword(password, user.password))) {
       // Record failed attempt
@@ -48,7 +48,6 @@ exports.login = async (req, res) => {
         attempt.attempts += 1;
         attempt.lastAttempt = Date.now();
         
-        // Block this device/IP for 30 minutes after 10 failed attempts
         if (attempt.attempts >= 10) {
           attempt.blockedUntil = Date.now() + 30 * 60 * 1000;
         }
@@ -66,24 +65,47 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Incorrect email or password' });
     }
 
-    // 4) Still check for account-level security (but with higher threshold)
-    if (user.loginAttempts >= 20) { // Higher threshold for account lock
+    // 4) Account-level security check
+    if (user.loginAttempts >= 20) {
       user.accountLocked = true;
-      user.lockUntil = Date.now() + 60 * 60 * 1000; // 1 hour lock
+      user.lockUntil = Date.now() + 60 * 60 * 1000;
       await user.save();
       return res.status(403).json({ 
         message: 'Account locked due to suspicious activity. Contact support.' 
       });
     }
 
-    // 5) Check verification and subscription status
+    // 5) Check verification status
     if (!user.isVerified) {
       return res.status(403).json({ message: 'Please verify your email first' });
     }
 
+    // 6) Generate token
+    const token = signToken(user._id);
+
+    // 7) Handle response based on user role and subscription
+    if (user.role === 'admin') {
+      // Admin users bypass all subscription checks
+      return res.status(200).json({
+        status: 'success',
+        token,
+        requiresSubscription: false,
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            isVerified: true,
+            isSubscribed: true, // Treat admin as always subscribed
+            role: user.role,
+            subscriptionPlan: 'admin'
+          }
+        }
+      });
+    }
+
     if (!user.isSubscribed) {
-      const token = signToken(user._id);
-      
+      // Non-admin users without subscription
       return res.status(200).json({
         status: 'partial-success',
         token,
@@ -92,19 +114,17 @@ exports.login = async (req, res) => {
           user: {
             id: user._id,
             email: user.email,
+            name: user.name,
             isVerified: user.isVerified,
             isSubscribed: false,
-            role: user.role // Add role here
+            role: user.role,
+            subscriptionPlan: null
           }
         }
       });
     }
 
-    // 6) If everything is OK, send token and user data
-   
-
-
-    // 6) Reset all attempt counters on successful login
+    // 8) Reset all security counters
     await LoginAttempt.deleteMany({ 
       $or: [
         { ipAddress: req.ip },
@@ -119,29 +139,24 @@ exports.login = async (req, res) => {
     user.lastLogin = Date.now();
     await user.save();
 
-    // 7) Generate token
-    const token = signToken(user._id);
-
-    // Clear any login attempts
-    await LoginAttempt.deleteMany({ email: user.email });
-    user.loginAttempts = 0;
-    await user.save();
-
+    // 9) Successful login for subscribed non-admin users
     res.status(200).json({
       status: 'success',
       token,
+      requiresSubscription: false,
       data: {
         user: {
           id: user._id,
           email: user.email,
           name: user.name,
           isVerified: user.isVerified,
-          isSubscribed: user.isSubscribed,
-          role: user.role, // Add role here
+          isSubscribed: true,
+          role: user.role,
           subscriptionPlan: user.subscriptionPlan
         }
       }
     });
+
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
