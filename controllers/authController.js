@@ -82,7 +82,7 @@ exports.login = async (req, res) => {
     }
 
     if (!user.isSubscribed) {
-      const token = signToken(user._id); // Still give token but with limited access
+      const token = signToken(user._id);
       
       return res.status(200).json({
         status: 'partial-success',
@@ -93,11 +93,16 @@ exports.login = async (req, res) => {
             id: user._id,
             email: user.email,
             isVerified: user.isVerified,
-            isSubscribed: false
+            isSubscribed: false,
+            role: user.role // Add role here
           }
         }
       });
     }
+
+    // 6) If everything is OK, send token and user data
+   
+
 
     // 6) Reset all attempt counters on successful login
     await LoginAttempt.deleteMany({ 
@@ -117,11 +122,24 @@ exports.login = async (req, res) => {
     // 7) Generate token
     const token = signToken(user._id);
 
+    // Clear any login attempts
+    await LoginAttempt.deleteMany({ email: user.email });
+    user.loginAttempts = 0;
+    await user.save();
+
     res.status(200).json({
       status: 'success',
       token,
       data: {
-        user
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          isVerified: user.isVerified,
+          isSubscribed: user.isSubscribed,
+          role: user.role, // Add role here
+          subscriptionPlan: user.subscriptionPlan
+        }
       }
     });
   } catch (err) {
