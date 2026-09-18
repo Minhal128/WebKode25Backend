@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npm ci --omit=dev"
+    "build": "node init && npm ci --omit=dev"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
